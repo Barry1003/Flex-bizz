@@ -1,588 +1,383 @@
-```markdown
 # Flex Bizz — System Architecture
 
-> **Technical blueprint** for the Flex Bizz social e-commerce platform. This document outlines the technology stack, system components, data architecture, and communication patterns that power the platform.
+> Technical blueprint for the Flex Bizz social e-commerce platform. This document outlines the technology stack, system components, and communication patterns.
 
 ---
 
 ## 1. High-Level Overview
 
-Flex Bizz is architected as a **modern, scalable three-tier application** designed to handle social interactions, e-commerce transactions, and real-time messaging simultaneously.
+Flex Bizz is a **three-tier social e-commerce platform** that combines marketplace functionality with social networking features.
 
 ### Architecture Layers
 
-**Presentation Layer (Frontend)**
-- Progressive Web App (PWA) built with Next.js
-- Server-side rendering (SSR) for optimal SEO and initial load performance
-- Responsive design for mobile-first experience
+**Presentation Layer**
+- Next.js PWA with server-side rendering
+- Responsive mobile-first design
+- Real-time UI updates via WebSocket
 
-**Application Layer (Backend)**
-- RESTful API services for CRUD operations
-- WebSocket connections for real-time features (chat, notifications)
-- Authentication and authorization middleware
-- Business logic and data validation
+**Application Layer**
+- RESTful API for core business logic
+- WebSocket server for real-time features
+- Authentication and authorization services
 
-**Data Layer (Persistence)**
-- PostgreSQL for structured, relational data
-- Redis for caching, session management, and pub/sub messaging
-- S3-compatible storage for media assets (images, videos)
+**Data Layer**
+- PostgreSQL for relational data
+- Redis for caching and sessions
+- S3 for media storage
 
 ---
 
 ## 2. Technology Stack
 
-### Frontend Technologies
-| Technology | Purpose | Justification |
-|-----------|---------|---------------|
-| **Next.js 14+** | React framework | SSR/SSG for SEO, API routes, optimized performance |
-| **TypeScript** | Type safety | Reduces runtime errors, better developer experience |
-| **Tailwind CSS** | Styling | Rapid UI development, consistent design system |
-| **Satoshi Font** | Typography | Modern, professional brand identity |
-| **React Query / SWR** | Data fetching | Smart caching, automatic refetching, optimistic updates |
-| **Socket.io Client** | Real-time comms | Bi-directional messaging for chat and notifications |
-| **Zustand / Redux** | State management | Centralized state for complex UI interactions |
+### Frontend
+- **Next.js 14+** - React framework with SSR/SSG for SEO
+- **TypeScript** - Type safety and better DX
+- **Tailwind CSS** - Utility-first styling
+- **React Query** - Data fetching and caching
+- **Socket.io Client** - Real-time messaging
 
-### Backend Technologies
-| Technology | Purpose | Justification |
-|-----------|---------|---------------|
-| **Node.js 20+** | Runtime | Non-blocking I/O, JavaScript ecosystem consistency |
-| **NestJS** | Framework | Structured architecture, built-in TypeScript, scalable |
-| **TypeScript** | Type safety | End-to-end type safety with frontend |
-| **Socket.io** | WebSockets | Real-time messaging, notifications, live updates |
-| **Passport.js** | Authentication | Flexible auth strategies (local, OAuth, JWT) |
-| **JWT** | Token management | Stateless authentication, secure API access |
-| **Bcrypt** | Password hashing | Industry-standard password security |
+### Backend
+- **Node.js + NestJS** - Structured, scalable backend framework
+- **TypeScript** - End-to-end type safety
+- **Socket.io** - WebSocket server for real-time features
+- **Passport.js + JWT** - Authentication and authorization
+- **Prisma ORM** - Type-safe database access
 
 ### Database & Infrastructure
-| Technology | Purpose | Justification |
-|-----------|---------|---------------|
-| **PostgreSQL 15+** | Primary database | ACID compliance, complex queries, relations |
-| **Prisma ORM** | Database toolkit | Type-safe queries, migrations, easy schema management |
-| **Redis 7+** | Cache & pub/sub | Fast data access, session storage, real-time events |
-| **AWS S3 / Cloudinary** | Media storage | Scalable file hosting, image optimization, CDN |
-| **Stripe / Paystack** | Payment processing | Secure payment gateway, subscription management |
+- **PostgreSQL** - Primary relational database
+- **Redis** - Caching, sessions, pub/sub
+- **AWS S3** - Media file storage
+- **Stripe/Paystack** - Payment processing
 
-### DevOps & Deployment
-| Technology | Purpose | Justification |
-|-----------|---------|---------------|
-| **Vercel** | Frontend hosting | Optimized for Next.js, global CDN, zero-config |
-| **Render / Railway** | Backend hosting | Easy deployment, auto-scaling, PostgreSQL included |
-| **Docker** | Containerization | Consistent environments across development and production |
-| **GitHub Actions** | CI/CD | Automated testing, building, and deployment |
-| **Jest & Supertest** | Testing | Unit and integration testing for reliability |
+### DevOps
+- **Vercel** - Frontend hosting and CDN
+- **Render/Railway** - Backend hosting
+- **GitHub Actions** - CI/CD pipeline
+- **Docker** - Containerization
 
 ---
 
 ## 3. System Architecture Diagram
-
 ```mermaid
 flowchart TB
-    subgraph Client Layer
-        Browser[User Browser / PWA]
-        Mobile[Mobile App]
+    subgraph Client
+        Browser[User Browser/PWA]
         Admin[Admin Dashboard]
     end
     
-    subgraph CDN Layer
-        Vercel[Vercel CDN]
+    subgraph Frontend
+        CDN[Vercel CDN]
+        Next[Next.js App]
     end
     
-    subgraph Application Layer
-        Frontend[Next.js Frontend]
+    subgraph Backend
         API[REST API - NestJS]
-        WS[WebSocket Server - Socket.io]
-        Auth[Auth Service - Passport/JWT]
+        WS[WebSocket - Socket.io]
+        Auth[Auth Service]
     end
     
-    subgraph Data Layer
-        DB[(PostgreSQL Database)]
-        Cache[(Redis Cache)]
-        Storage[S3 Media Storage]
+    subgraph Data
+        DB[(PostgreSQL)]
+        Cache[(Redis)]
+        Storage[S3 Storage]
     end
     
-    subgraph External Services
-        Payment[Payment Gateway - Stripe/Paystack]
-        Email[Email Service - SendGrid]
-        SMS[SMS Service - Twilio]
+    subgraph External
+        Payment[Stripe/Paystack]
+        Email[Email Service]
     end
     
-    Browser -->|HTTPS| Vercel
-    Mobile -->|HTTPS| Vercel
-    Admin -->|HTTPS| Vercel
-    Vercel --> Frontend
-    
-    Frontend -->|REST API| API
-    Frontend -->|WebSocket| WS
-    Admin -->|REST API| API
-    
+    Browser --> CDN
+    Admin --> CDN
+    CDN --> Next
+    Next --> API
+    Next --> WS
     API --> Auth
-    Auth --> DB
     API --> DB
     API --> Cache
     API --> Storage
     API --> Payment
     API --> Email
-    API --> SMS
-    
     WS --> Cache
     WS --> DB
 ```
 
 ---
 
-## 4. Component Details
+## 4. Core Components
 
 ### 4.1 Frontend (Next.js)
 
 **Responsibilities:**
-- Render dynamic product pages with SEO optimization
-- Handle user interactions and form submissions
-- Manage client-side routing and navigation
-- Display real-time updates via WebSocket connections
-- Implement responsive design for all screen sizes
+- Server-side rendering for SEO
+- Client-side navigation and routing
+- Real-time updates via WebSocket
+- Form handling and validation
+- Image optimization
 
-**Key Features:**
-- Server-side rendering for product listings and search results
-- Static generation for content pages (About, Terms, etc.)
-- Image optimization with Next.js Image component
-- Progressive Web App capabilities (offline support, installable)
-- Code splitting for optimal bundle sizes
-
-**Folder Structure:**
-```
-/app
-  /products
-  /profile
-  /cart
-  /checkout
-/components
-  /ui
-  /features
-/lib
-  /api
-  /hooks
-/public
-/styles
-```
+**Key Pages:**
+- Product listings and search
+- Product detail pages
+- User profiles and stores
+- Shopping cart and checkout
+- Chat messaging interface
+- Admin dashboard
 
 ---
 
 ### 4.2 Backend API (NestJS)
 
-**Responsibilities:**
-- Expose RESTful endpoints for CRUD operations
-- Validate and sanitize incoming requests
-- Enforce authentication and authorization
-- Process business logic
-- Integrate with external services (payments, notifications)
+**Key Modules:**
 
-**API Modules:**
-
-**Authentication Module**
-- `POST /auth/register` - User registration
-- `POST /auth/login` - User login (returns JWT)
-- `POST /auth/logout` - Invalidate session
-- `POST /auth/refresh` - Refresh access token
-- `GET /auth/profile` - Get current user profile
+**Auth Module**
+- User registration and login
+- JWT token generation
+- Password reset and email verification
 
 **User Module**
-- `GET /users/:id` - Get user profile
-- `PATCH /users/:id` - Update user profile
-- `GET /users/:id/products` - Get user's products
-- `GET /users/:id/followers` - Get followers list
-- `POST /users/:id/follow` - Follow a user
+- Profile management
+- Follow/unfollow users
+- User product listings
 
 **Product Module**
-- `GET /products` - List products (with filters, pagination)
-- `GET /products/:id` - Get single product details
-- `POST /products` - Create new product
-- `PATCH /products/:id` - Update product
-- `DELETE /products/:id` - Delete product
-- `POST /products/:id/like` - Like/unlike product
+- CRUD operations for products
+- Product search and filtering
+- Product likes and views tracking
 
 **Order Module**
-- `GET /orders` - List user orders
-- `GET /orders/:id` - Get order details
-- `POST /orders` - Create new order
-- `PATCH /orders/:id/status` - Update order status (seller/admin)
-- `POST /orders/:id/cancel` - Cancel order
+- Order creation and management
+- Order status updates
+- Order history
 
 **Payment Module**
-- `POST /payments/initiate` - Initialize payment
-- `POST /payments/webhook` - Handle payment provider webhooks
-- `GET /payments/:id` - Get payment status
+- Payment initialization
+- Webhook handling
+- Transaction records
 
-**Search Module**
-- `GET /search` - Full-text search across products
-- `GET /search/suggestions` - Autocomplete suggestions
-
-**Admin Module**
-- `GET /admin/users` - List all users
-- `PATCH /admin/users/:id/status` - Ban/unban user
-- `GET /admin/analytics` - Platform analytics
-- `GET /admin/reports` - User reports and moderation queue
+**Chat Module**
+- Message sending and receiving
+- Conversation management
+- Unread message tracking
 
 ---
 
-### 4.3 WebSocket Server (Socket.io)
+### 4.3 WebSocket Server
 
-**Responsibilities:**
-- Manage real-time connections
-- Handle chat messaging between users
-- Push notifications to connected clients
-- Broadcast live updates (new followers, likes, orders)
+**Real-Time Features:**
+- Direct messaging between users
+- Live notifications (likes, follows, orders)
+- Typing indicators
+- Online status
+- Live product updates
 
 **Events:**
-
-**Chat Events:**
-- `chat:join` - Join a conversation room
-- `chat:message` - Send a message
-- `chat:typing` - Indicate typing status
-- `chat:read` - Mark messages as read
-
-**Notification Events:**
-- `notification:new` - Push new notification to user
-- `notification:read` - Mark notification as read
-
-**Activity Events:**
-- `product:liked` - Product received a new like
-- `order:status` - Order status changed
-- `user:followed` - New follower notification
+- `chat:message` - Send/receive messages
+- `notification:new` - Push notifications
+- `product:liked` - Real-time like updates
+- `order:status` - Order status changes
 
 ---
 
-### 4.4 Database Schema (PostgreSQL)
+### 4.4 Database Schema
 
 **Core Tables:**
-
-**users**
-```sql
-id              UUID PRIMARY KEY
-username        VARCHAR(50) UNIQUE NOT NULL
-email           VARCHAR(255) UNIQUE NOT NULL
-password_hash   VARCHAR(255) NOT NULL
-display_name    VARCHAR(100)
-bio             TEXT
-avatar_url      VARCHAR(500)
-phone           VARCHAR(20)
-is_verified     BOOLEAN DEFAULT FALSE
-is_seller       BOOLEAN DEFAULT FALSE
-created_at      TIMESTAMP DEFAULT NOW()
-updated_at      TIMESTAMP DEFAULT NOW()
 ```
+users
+- id, username, email, password_hash
+- display_name, bio, avatar_url
+- is_verified, is_seller
+- created_at, updated_at
 
-**products**
-```sql
-id              UUID PRIMARY KEY
-seller_id       UUID REFERENCES users(id)
-title           VARCHAR(200) NOT NULL
-description     TEXT
-price           DECIMAL(10,2) NOT NULL
-category        VARCHAR(50)
-condition       VARCHAR(20)
-stock_quantity  INTEGER DEFAULT 1
-images          JSONB
-tags            VARCHAR(50)[]
-status          VARCHAR(20) DEFAULT 'active'
-views_count     INTEGER DEFAULT 0
-likes_count     INTEGER DEFAULT 0
-created_at      TIMESTAMP DEFAULT NOW()
-updated_at      TIMESTAMP DEFAULT NOW()
-```
+products
+- id, seller_id, title, description
+- price, category, condition
+- stock_quantity, images, tags
+- status, views_count, likes_count
+- created_at, updated_at
 
-**orders**
-```sql
-id              UUID PRIMARY KEY
-buyer_id        UUID REFERENCES users(id)
-seller_id       UUID REFERENCES users(id)
-product_id      UUID REFERENCES products(id)
-quantity        INTEGER NOT NULL
-total_amount    DECIMAL(10,2) NOT NULL
-status          VARCHAR(20) DEFAULT 'pending'
-payment_status  VARCHAR(20) DEFAULT 'pending'
-shipping_address JSONB
-created_at      TIMESTAMP DEFAULT NOW()
-updated_at      TIMESTAMP DEFAULT NOW()
-```
+orders
+- id, buyer_id, seller_id, product_id
+- quantity, total_amount
+- status, payment_status
+- shipping_address
+- created_at, updated_at
 
-**messages**
-```sql
-id              UUID PRIMARY KEY
-conversation_id UUID REFERENCES conversations(id)
-sender_id       UUID REFERENCES users(id)
-content         TEXT NOT NULL
-is_read         BOOLEAN DEFAULT FALSE
-created_at      TIMESTAMP DEFAULT NOW()
-```
+messages
+- id, conversation_id, sender_id
+- content, is_read
+- created_at
 
-**conversations**
-```sql
-id              UUID PRIMARY KEY
-participant_1   UUID REFERENCES users(id)
-participant_2   UUID REFERENCES users(id)
-last_message_at TIMESTAMP
-created_at      TIMESTAMP DEFAULT NOW()
-```
+conversations
+- id, participant_1, participant_2
+- last_message_at, created_at
 
-**follows**
-```sql
-follower_id     UUID REFERENCES users(id)
-following_id    UUID REFERENCES users(id)
-created_at      TIMESTAMP DEFAULT NOW()
-PRIMARY KEY (follower_id, following_id)
-```
+follows
+- follower_id, following_id
+- created_at
 
-**likes**
-```sql
-user_id         UUID REFERENCES users(id)
-product_id      UUID REFERENCES products(id)
-created_at      TIMESTAMP DEFAULT NOW()
-PRIMARY KEY (user_id, product_id)
-```
-
----
-
-### 4.5 Caching Strategy (Redis)
-
-**Use Cases:**
-- **Session storage:** User sessions and JWT blacklist
-- **Hot data caching:** Frequently accessed products, user profiles
-- **Rate limiting:** API request throttling per user
-- **Pub/Sub:** Real-time event broadcasting to WebSocket clients
-- **Temporary data:** OTP codes, password reset tokens
-
-**Key Patterns:**
-```
-user:session:{userId}           - User session data (TTL: 7 days)
-user:profile:{userId}           - Cached user profile (TTL: 1 hour)
-product:{productId}             - Cached product details (TTL: 30 min)
-trending:products               - List of trending products (TTL: 15 min)
-ratelimit:{userId}:{endpoint}   - API rate limit counters (TTL: 1 min)
-otp:{email}                     - Email verification codes (TTL: 10 min)
+likes
+- user_id, product_id
+- created_at
 ```
 
 ---
 
 ## 5. Data Flow Examples
 
-### 5.1 User Registration Flow
-
+### User Registration
 ```
-1. User submits registration form → Frontend
-2. Frontend sends POST /auth/register → Backend API
-3. Backend validates data, checks for duplicates → PostgreSQL
-4. Backend hashes password with bcrypt
-5. Backend creates user record → PostgreSQL
-6. Backend sends verification email → Email Service
-7. Backend returns JWT token → Frontend
-8. Frontend stores token in httpOnly cookie
-9. Frontend redirects to dashboard
+1. User submits form → Frontend
+2. POST /auth/register → Backend API
+3. Validate and hash password → bcrypt
+4. Create user record → PostgreSQL
+5. Send verification email → Email Service
+6. Return JWT token → Frontend
+7. Store token in httpOnly cookie
 ```
 
-### 5.2 Product Purchase Flow
-
+### Product Purchase
 ```
 1. User clicks "Buy Now" → Frontend
-2. Frontend sends POST /orders → Backend API
-3. Backend validates product availability → PostgreSQL
-4. Backend creates pending order → PostgreSQL
-5. Backend initiates payment → Stripe/Paystack
-6. Payment provider redirects user to payment page
-7. User completes payment
-8. Payment provider sends webhook → Backend
-9. Backend updates order status → PostgreSQL
-10. Backend sends confirmation email → Email Service
-11. Backend notifies seller via WebSocket → Socket.io
-12. Frontend updates UI to show order confirmation
+2. POST /orders → Backend API
+3. Check product availability → PostgreSQL
+4. Create pending order → PostgreSQL
+5. Initiate payment → Stripe/Paystack
+6. User completes payment
+7. Webhook received → Backend
+8. Update order status → PostgreSQL
+9. Send notifications → WebSocket & Email
 ```
 
-### 5.3 Real-Time Chat Flow
-
+### Real-Time Chat
 ```
-1. User opens chat with seller → Frontend
-2. Frontend establishes WebSocket connection → Socket.io
-3. User types message → Frontend
-4. Frontend emits chat:message event → Socket.io
-5. Socket.io stores message → PostgreSQL
-6. Socket.io broadcasts message to recipient → Socket.io Client
-7. Recipient's frontend displays message
-8. Recipient's frontend emits chat:read event
-9. Socket.io updates message status → PostgreSQL
+1. Establish WebSocket connection → Socket.io
+2. User sends message → Frontend
+3. Emit chat:message event → Socket.io Server
+4. Save message → PostgreSQL
+5. Broadcast to recipient → Socket.io Client
+6. Display message → Frontend
+7. Emit read receipt → Socket.io
 ```
 
 ---
 
-## 6. Security Considerations
+## 6. Security Measures
 
-### Authentication & Authorization
-- JWT tokens with short expiration (15 min access, 7 days refresh)
-- HTTP-only cookies to prevent XSS attacks
-- Refresh token rotation on each use
-- Role-based access control (RBAC) for admin features
-- Email verification required for sellers
+**Authentication**
+- JWT with short expiration (15 min access token)
+- HTTP-only cookies prevent XSS
+- Refresh token rotation
+- Email verification for sellers
 
-### Data Protection
-- HTTPS/TLS encryption for all communications
-- Password hashing with bcrypt (cost factor: 12)
-- Input validation and sanitization on all endpoints
-- SQL injection prevention via Prisma ORM parameterized queries
-- CORS configuration to allow only trusted origins
+**Data Protection**
+- HTTPS/TLS encryption
+- Bcrypt password hashing (cost: 12)
+- Input validation on all endpoints
+- SQL injection prevention via Prisma
+- CORS configuration
 
-### Rate Limiting
-- 100 requests per minute per user for general endpoints
-- 10 requests per minute for authentication endpoints
-- 5 requests per minute for payment initiation
-- IP-based rate limiting for public endpoints
-
-### File Upload Security
-- File type validation (images only: jpg, png, webp)
-- File size limits (5MB per image, max 5 images per product)
-- Virus scanning for uploaded files
-- Signed URLs for private media access
+**Rate Limiting**
+- 100 requests/min per user (general)
+- 10 requests/min (auth endpoints)
+- 5 requests/min (payments)
 
 ---
 
-## 7. Scalability & Performance
+## 7. Scalability Strategy
 
-### Horizontal Scaling
-- Stateless API design allows multiple backend instances
-- Load balancer distributes traffic across instances
-- WebSocket sticky sessions for connection persistence
-- Database connection pooling (max 20 connections per instance)
+**Performance Optimization**
+- Redis caching for hot data
+- CDN for static assets
+- Database indexing on key columns
+- API response caching
+- Image optimization via CDN
 
-### Caching Strategy
-- Redis caching reduces database load by 60-70%
-- CDN caching for static assets (images, CSS, JS)
-- Browser caching with appropriate cache headers
-- API response caching for read-heavy endpoints
+**Horizontal Scaling**
+- Stateless API design
+- Load balancer for multiple instances
+- Database connection pooling
+- WebSocket sticky sessions
 
-### Database Optimization
-- Indexes on frequently queried columns (username, email, product category)
-- Pagination for all list endpoints (limit: 20 items per page)
-- Database query optimization with EXPLAIN ANALYZE
-- Prepared statements for repeated queries
-
-### Monitoring & Observability
-- Application logging with Winston or Pino
-- Error tracking with Sentry
-- Performance monitoring with New Relic or Datadog
-- Database query monitoring with pg_stat_statements
-- Uptime monitoring with Pingdom or UptimeRobot
+**Monitoring**
+- Application logging (Winston/Pino)
+- Error tracking (Sentry)
+- Performance monitoring
+- Database query analysis
 
 ---
 
-## 8. Deployment Strategy
+## 8. Deployment Pipeline
 
-### Development Environment
-- Local development with Docker Compose
-- Hot reloading for frontend and backend
-- Seeded database with test data
-- Environment variables in `.env.local`
+**Development**
+- Local Docker Compose setup
+- Hot reloading enabled
+- Seeded test data
 
-### Staging Environment
-- Deployed on Vercel (frontend) and Render (backend)
-- Separate database instance for testing
-- Automated deployments on push to `develop` branch
-- Integration testing before production release
+**Staging**
+- Auto-deploy from `develop` branch
+- Integration testing
+- Separate database instance
 
-### Production Environment
-- Frontend: Vercel with automatic scaling
-- Backend: Render or AWS ECS with load balancing
-- Database: Managed PostgreSQL (AWS RDS, Render, or Supabase)
-- Redis: Managed Redis (Upstash or Redis Cloud)
-- Storage: AWS S3 with CloudFront CDN
+**Production**
+- Manual approval required
+- Zero-downtime deployments
+- Automated rollback on failure
+- Health checks and monitoring
 
-### CI/CD Pipeline (GitHub Actions)
-```yaml
-1. Code push to repository
-2. Run linter (ESLint, Prettier)
-3. Run unit tests (Jest)
-4. Run integration tests (Supertest)
-5. Build Docker images
-6. Push images to registry
-7. Deploy to staging
-8. Run smoke tests
-9. Deploy to production (manual approval required)
+**CI/CD Steps:**
+```
+1. Code push to GitHub
+2. Run linters (ESLint, Prettier)
+3. Run tests (Jest, Supertest)
+4. Build Docker images
+5. Deploy to staging
+6. Run smoke tests
+7. Deploy to production (manual)
 ```
 
 ---
 
-## 9. Technical Feasibility
+## 9. Why This Architecture Works
 
-### Why This Architecture Works
-
-**Proven Technology Stack**
-- Next.js and NestJS are battle-tested frameworks used by Fortune 500 companies
-- PostgreSQL handles millions of transactions per day in production systems
-- Socket.io powers real-time features in Slack, Microsoft, and other major platforms
-
-**Developer Experience**
-- TypeScript across the stack reduces integration bugs
-- Shared data types between frontend and backend
-- Extensive documentation and community support
-- Rich ecosystem of libraries and tools
+**Proven Technologies**
+- Next.js and NestJS are production-ready
+- PostgreSQL handles high transaction volumes
+- Socket.io powers major real-time applications
 
 **Cost-Effective**
-- Vercel free tier supports up to 100GB bandwidth
-- Render free tier for MVP development
-- Managed database services start at $5-10/month
-- Pay-as-you-grow model for all services
+- Free tier options for MVP (Vercel, Render)
+- Managed services reduce DevOps overhead
+- Pay-as-you-grow pricing model
 
-**Rapid Development**
-- ORM (Prisma) accelerates database operations
-- Next.js API routes for quick prototyping
-- Pre-built authentication strategies with Passport.js
-- Component libraries (shadcn/ui) for fast UI development
+**Developer-Friendly**
+- TypeScript reduces bugs
+- Strong ecosystem and community
+- Fast iteration and prototyping
+- Clear separation of concerns
 
-**Scalability Path**
-- Can start with a monolith and split into microservices later
-- Database can be scaled vertically initially, then horizontally with read replicas
-- CDN and caching reduce server load significantly
-- WebSocket server can be separated as traffic grows
+**Scalable**
+- Can start simple and grow incrementally
+- Clear path to microservices if needed
+- Caching reduces database load
+- CDN handles traffic spikes
 
 ---
 
 ## 10. Future Enhancements
 
-### Phase 2 Features
-- Elasticsearch for advanced product search
-- Redis pub/sub for distributed WebSocket messaging
-- Background job processing with Bull Queue
-- Image processing pipeline with Sharp or Cloudinary
+**Phase 2**
+- Advanced search with Elasticsearch
+- Background job processing
+- Image processing pipeline
 - GraphQL API for mobile apps
 
-### Phase 3 Features
-- Microservices architecture (separate services for auth, products, orders)
-- Event-driven architecture with Kafka or RabbitMQ
-- Machine learning recommendations
-- Multi-currency support
-- Internationalization (i18n) for multiple languages
-
----
-
-## 11. Conclusion
-
-This architecture provides a **solid foundation** for Flex Bizz to launch as an MVP while maintaining a **clear path to scale**. The technology choices balance developer productivity, performance, and cost-effectiveness.
-
-**Key Strengths:**
-- Modern, maintainable codebase
-- Real-time capabilities for social features
-- Secure authentication and payment processing
-- Optimized for SEO and user experience
-- Ready for rapid iteration and growth
-
-**Next Steps:**
-1. Set up development environment
-2. Initialize Git repository with project structure
-3. Configure CI/CD pipeline
-4. Implement authentication module
-5. Build product listing and search features
-6. Integrate payment gateway
-7. Deploy MVP to staging
+**Phase 3**
+- Microservices architecture
+- Event-driven system (Kafka/RabbitMQ)
+- ML-based recommendations
+- Multi-currency and i18n support
 
 ---
 
 **Document Version:** 1.0  
-**Last Updated:** November 10, 2025  
-**Author:** Flex Bizz Development Team
-```
+**Last Updated:** November 10, 2025
