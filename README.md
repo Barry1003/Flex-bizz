@@ -1,6 +1,6 @@
 # Flex Bizz — Social E-commerce for Small Businesses
 
-**What Flex Bizz does (short):**  
+**What Flex Bizz does:**  
 Flex Bizz is a social-first e-commerce platform where small business owners showcase products, share short video promos, and build customer relationships — all in one interactive feed. Buyers can discover products through social interactions (likes, comments, shares), follow stores, and make purchases without leaving the social experience.
 
 ---
